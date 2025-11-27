@@ -120,10 +120,17 @@ function parseNominatimAddress(result: NominatimResult): {
 async function searchLocation(query: string): Promise<any> {
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&addressdetails=1`
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&addressdetails=1`,
+      {
+        headers: {
+          "User-Agent": "RovoDevInteractiveMap/1.0 (rovo-dev-project)",
+          "Referer": "https://rovo-dev-project.vercel.app"
+        }
+      }
     );
 
     if (!response.ok) {
+      console.error(`Nominatim Error status: ${response.status}`);
       throw new Error("Error en la búsqueda");
     }
 
