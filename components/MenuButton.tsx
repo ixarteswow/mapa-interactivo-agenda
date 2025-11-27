@@ -14,6 +14,7 @@ const MenuButton: FC<MenuButtonProps> = ({ onClick }) => {
       aria-label="Abrir menú de direcciones"
     >
       <svg
+        suppressHydrationWarning
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"

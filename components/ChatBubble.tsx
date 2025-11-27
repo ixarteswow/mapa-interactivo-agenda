@@ -15,6 +15,7 @@ const ChatBubble: FC<ChatBubbleProps> = ({ onClick }) => {
       aria-label="Abrir chat"
     >
       <svg
+        suppressHydrationWarning
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
