@@ -6,8 +6,12 @@ import { AVAILABLE_TOOLS, type ToolResult } from "@/lib/chat-tools";
 import { executeServerAction } from "./actions";
 import { MODEL_NAME, withRetry, apiMonitor } from "@/lib/ai-service";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 /**
  * Convierte las herramientas a formato de functionDeclarations de Gemini
+
  */
 function convertToolsToFunctionDeclarations(): FunctionDeclaration[] {
   return AVAILABLE_TOOLS.map((tool) => ({
