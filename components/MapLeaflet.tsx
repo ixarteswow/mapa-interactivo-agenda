@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css"; // estilos de Leaflet solo en el cliente
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, CircleMarker } from "react-leaflet";
 import { type FC, Fragment, useEffect, useId, useState, useRef } from "react";
 import { useMapStore } from "@/hooks/useMapStore";
+import { useAuthStore } from "@/hooks/useAuthStore";
 import LocationModal from "./LocationModal";
 import L from "leaflet";
 import { getGroupColor } from "@/lib/colors";
@@ -158,6 +159,8 @@ const MapLeaflet: FC<MapLeafletProps> = ({ sidebarOpen }) => {
   }, [mounted, setCenter, setZoom, persistedCenter, persistedZoom]);
 
   const handleDoubleClick = (lat: number, lng: number) => {
+    const isAdmin = useAuthStore.getState().role === "admin";
+    if (!isAdmin) return;
     setPendingCoordinates({ lat, lng });
     setModalOpen(true);
   };

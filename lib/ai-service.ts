@@ -13,7 +13,106 @@ import {
  */
 
 // Configuración del modelo
-const MODEL_NAME = "gemini-2.5-flash";
+export const MODEL_NAME = process.env.NEXT_PUBLIC_MODEL_NAME || "gemini-3.1-flash-lite";
+
+/**
+ * Monitor para rastrear el uso de la API y el límite de 15 RPM
+ */
+class RequestMonitor {
+  private requests: number[] = [];
+  private readonly WINDOW_MS = 60000; // 1 minuto
+
+  /**
+   * Registra una nueva petición
+   */
+  recordRequest() {
+    const now = Date.now();
+    this.requests.push(now);
+    this.cleanOldRequests();
+    
+    const currentRPM = this.requests.length;
+    console.log(`\x1b[36m[API Monitor]\x1b[0m Petición registrada. Uso actual: \x1b[33m${currentRPM}/15 RPM\x1b[0m (último minuto)`);
+    
+    if (currentRPM >= 13) {
+      console.warn("\x1b[31m[API Monitor] ADVERTENCIA: Te estás acercando al límite de 15 RPM.\x1b[0m");
+    }
+  }
+
+  /**
+   * Elimina las peticiones que tienen más de 1 minuto
+   */
+  private cleanOldRequests() {
+    const now = Date.now();
+    this.requests = this.requests.filter(time => now - time < this.WINDOW_MS);
+  }
+
+  /**
+   * Obtiene el número de peticiones en el último minuto
+   */
+  getCurrentRPM(): number {
+    this.cleanOldRequests();
+    return this.requests.length;
+  }
+}
+
+// Instancia única del monitor
+export const apiMonitor = new RequestMonitor();
+
+/**
+ * Utilidad para esperar un tiempo determinado
+ */
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Ejecuta una función con reintentos y backoff exponencial si hay errores de Rate Limit (429)
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  initialDelay = 2000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      // Registrar la petición en el monitor
+      apiMonitor.recordRequest();
+      
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const errorMessage = error.message || "";
+      
+      // Verificar si es un error de Rate Limit (429)
+      const isRateLimit = 
+        errorMessage.includes("429") || 
+        error.status === 429 || 
+        errorMessage.toLowerCase().includes("too many requests") ||
+        errorMessage.toLowerCase().includes("quota exceeded");
+
+      if (isRateLimit && i < maxRetries) {
+        let delay = initialDelay * Math.pow(2, i);
+        
+        // Intentar extraer el tiempo de espera recomendado por la API (ej: "Please retry in 24s")
+        const retryMatch = errorMessage.match(/retry in ([\d.]+s)/);
+        if (retryMatch && retryMatch[1]) {
+          const seconds = parseFloat(retryMatch[1]);
+          delay = (seconds + 1) * 1000; // Agregar 1s de margen
+          console.warn(`\x1b[35m[API Monitor]\x1b[0m La API solicita esperar ${retryMatch[1]}. Esperando ${delay}ms...`);
+        } else {
+          console.warn(`\x1b[35m[API Monitor]\x1b[0m Rate limit alcanzado. Reintentando en ${delay}ms... (Intento ${i + 1}/${maxRetries})`);
+        }
+        
+        await sleep(delay);
+        continue;
+      }
+      
+      throw error;
+    }
+  }
+  
+  throw lastError;
+}
 
 /**
  * Obtiene la instancia de Google AI
@@ -178,7 +277,7 @@ Responde de forma concisa, amigable y útil.`;
     });
 
     // Enviar mensaje del usuario
-    let result = await chat.sendMessage(userMessage);
+    let result = await withRetry(() => chat.sendMessage(userMessage));
     let response = await result.response;
     let responseText = response.text();
 
@@ -220,7 +319,7 @@ Responde de forma concisa, amigable y útil.`;
         ];
 
         // Continuar la conversación
-        result = await chat.sendMessage(functionResponse);
+        result = await withRetry(() => chat.sendMessage(functionResponse));
         response = await result.response;
       }
       responseText = response.text();

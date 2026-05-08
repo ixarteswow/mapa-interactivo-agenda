@@ -4,6 +4,7 @@ import { GoogleGenerativeAI, type FunctionDeclaration, type Tool } from "@google
 import type { AddressEntry } from "@/hooks/useMapStore";
 import { AVAILABLE_TOOLS, type ToolResult } from "@/lib/chat-tools";
 import { executeServerAction } from "./actions";
+import { MODEL_NAME, withRetry, apiMonitor } from "@/lib/ai-service";
 
 /**
  * Convierte las herramientas a formato de functionDeclarations de Gemini
@@ -147,7 +148,7 @@ Responde de forma concisa, amigable y útil.`;
 
     // Obtener modelo
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash", // IMPERATIVO: Usar gemini-2.5-flash
+      model: MODEL_NAME, 
       systemInstruction: systemInstruction,
       tools: tools,
     });
@@ -170,7 +171,7 @@ Responde de forma concisa, amigable y útil.`;
     });
 
     // Enviar mensaje
-    let result = await chat.sendMessage(userMessage);
+    let result = await withRetry(() => chat.sendMessage(userMessage));
     let response = await result.response;
     let responseText = response.text();
 
@@ -193,7 +194,7 @@ Responde de forma concisa, amigable y útil.`;
       );
 
       // Ejecutar todas las llamadas de este turno
-      const functionResponses = [];
+      const functionResponses: any[] = [];
       
       for (const call of functionCalls) {
         console.log("  → Ejecutando:", call.name, call.args);
@@ -223,7 +224,7 @@ Responde de forma concisa, amigable y útil.`;
       // Enviar resultados de vuelta a la IA
       if (functionResponses.length > 0) {
         // Continuar la conversación con los resultados
-        result = await chat.sendMessage(functionResponses);
+        result = await withRetry(() => chat.sendMessage(functionResponses));
         response = await result.response;
         
         // Verificar si hay NUEVAS llamadas a funciones en la respuesta
@@ -237,9 +238,18 @@ Responde de forma concisa, amigable y útil.`;
     }
 
     // Retornar respuesta
+    const totalPromptRequests = toolsUsed.length + 1 + (depth > 0 ? depth : 0); // Estimación simple o usar monitor
+    console.log(`\x1b[32m[Chat Summary]\x1b[0m Prompt finalizado. Consumo total estimado: \x1b[33m${totalPromptRequests}\x1b[0m peticiones API.`);
+
+    const currentRPM = apiMonitor.getCurrentRPM();
+
     return NextResponse.json({
       text: responseText,
       toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
+      usage: {
+        promptRequests: totalPromptRequests,
+        currentRPM: currentRPM
+      }
     });
   } catch (error) {
     console.error("❌ Error en API Route /api/chat:", error);

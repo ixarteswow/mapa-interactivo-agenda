@@ -10,6 +10,8 @@ import FocusTrap from "focus-trap-react";
 import { groupLocations, getGroupStats, getUniqueGroups, DEFAULT_GROUP } from "@/types";
 import { getGroupColor } from "@/lib/colors";
 import LocationModal from "./LocationModal";
+import { useAuthStore } from "@/hooks/useAuthStore";
+import { logoutAction } from "@/app/login/actions";
 
 // Nuevas props para controlar la visibilidad en dispositivos móviles
 interface SidebarProps {
@@ -52,6 +54,9 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
   const setCenter = useMapStore((s) => s.setCenter);
   const setZoom = useMapStore((s) => s.setZoom);
   const updateMarker = useMapStore((s) => s.updateMarker);
+
+  const role = useAuthStore((s) => s.role);
+  const isAdmin = role === "admin";
 
   const toast = useToastStore((s) => s.enqueue);
   const { showConfirm, showPrompt } = useModal();
@@ -253,6 +258,7 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
   );
 
   const startInline = (m: (typeof markers)[number], field: InlineField) => {
+    if (!isAdmin) return;
     // Si hay otra edición inline abierta, la cerramos sin guardar
     setInlineEdit({ id: m.id, field, value: String(m[field] ?? "") });
   };
@@ -338,7 +344,14 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
     >
       {/* Encabezado con título y botón de cierre para móvil */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Mis Direcciones</h2>
+        <div>
+          <h2 className="text-2xl font-bold">Mis Direcciones</h2>
+          <form action={logoutAction}>
+            <button type="submit" className="text-xs text-red-400 hover:text-red-300 underline mt-1">
+              Cerrar sesión
+            </button>
+          </form>
+        </div>
         <div className="flex items-center gap-2">
           {/* Botón de ocultar para escritorio */}
           <button
@@ -602,32 +615,34 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
                           {m.coordinates.lat.toFixed(5)}, {m.coordinates.lng.toFixed(5)}
                         </p>
                       </button>
-                      <div className="flex flex-col gap-1 items-end ml-2">
-                        <div className="flex gap-1">
+                      {isAdmin && (
+                        <div className="flex flex-col gap-1 items-end ml-2">
+                          <div className="flex gap-1">
+                            <button
+                              className="text-gray-300 hover:text-white text-xs px-2 py-1 rounded border border-gray-600 hover:border-gray-500"
+                              onClick={() => onRenameClick(m.id, m.name)}
+                              title="Renombrar"
+                            >
+                              Renombrar
+                            </button>
+                            <button
+                              className="text-gray-300 hover:text-white text-xs px-2 py-1 rounded border border-gray-600 hover:border-gray-500"
+                              onClick={() => setEditingId(m.id)}
+                              title="Editar"
+                            >
+                              Editar
+                            </button>
+                          </div>
                           <button
-                            className="text-gray-300 hover:text-white text-xs px-2 py-1 rounded border border-gray-600 hover:border-gray-500"
-                            onClick={() => onRenameClick(m.id, m.name)}
-                            title="Renombrar"
+                            className="text-gray-400 hover:text-red-400 text-xl leading-none"
+                            aria-label={`Eliminar ${m.name ?? "Marcador"}`}
+                            onClick={() => onDeleteClick(m.id, m.name)}
+                            title="Eliminar"
                           >
-                            Renombrar
-                          </button>
-                          <button
-                            className="text-gray-300 hover:text-white text-xs px-2 py-1 rounded border border-gray-600 hover:border-gray-500"
-                            onClick={() => setEditingId(m.id)}
-                            title="Editar"
-                          >
-                            Editar
+                            &times;
                           </button>
                         </div>
-                        <button
-                          className="text-gray-400 hover:text-red-400 text-xl leading-none"
-                          aria-label={`Eliminar ${m.name ?? "Marcador"}`}
-                          onClick={() => onDeleteClick(m.id, m.name)}
-                          title="Eliminar"
-                        >
-                          &times;
-                        </button>
-                      </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -637,28 +652,30 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
       </div>
 
       {/* Botones de Acción */}
-      <div className="mt-4 pt-4 border-t border-gray-700">
-        <button
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-2"
-          onClick={() => setIsCreating(true)}
-        >
-          + Añadir Nueva Dirección
-        </button>
-        <div className="flex space-x-2">
+      {isAdmin && (
+        <div className="mt-4 pt-4 border-t border-gray-700">
           <button
-            className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded"
-            onClick={onImportClick}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-2"
+            onClick={() => setIsCreating(true)}
           >
-            Importar
+            + Añadir Nueva Dirección
           </button>
-          <button
-            className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded"
-            onClick={onExportClick}
-          >
-            Exportar
-          </button>
+          <div className="flex space-x-2">
+            <button
+              className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded"
+              onClick={onImportClick}
+            >
+              Importar
+            </button>
+            <button
+              className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded"
+              onClick={onExportClick}
+            >
+              Exportar
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Modal de edición / creación */}
       <LocationModal

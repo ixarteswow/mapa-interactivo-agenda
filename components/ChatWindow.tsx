@@ -42,6 +42,7 @@ interface ChatWindowProps {
  */
 const ChatWindow: FC<ChatWindowProps> = ({ onClose }) => {
   const [inputValue, setInputValue] = useState("");
+  const [lastUsage, setLastUsage] = useState<{ promptRequests: number; currentRPM: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Stores
@@ -161,6 +162,12 @@ const ChatWindow: FC<ChatWindowProps> = ({ onClose }) => {
       
       // Agregar respuesta del asistente
       addMessage("assistant", response.text);
+      
+      // Guardar información de uso
+      if (response.usage) {
+        setLastUsage(response.usage);
+      }
+      
       setError(null);
     } catch (error) {
       console.error("Error al enviar mensaje:", error);
@@ -308,6 +315,19 @@ const ChatWindow: FC<ChatWindowProps> = ({ onClose }) => {
           </>
         )}
       </div>
+
+      {/* Indicador de uso de API */}
+      {lastUsage && (
+        <div className="px-4 py-2 bg-gray-900/60 border-t border-gray-700 flex justify-between items-center text-xs text-gray-300 font-medium">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span>
+            <span>Último prompt: <strong className="text-white">{lastUsage.promptRequests}</strong> peticiones</span>
+          </div>
+          <div className={`flex items-center gap-2 ${lastUsage.currentRPM >= 13 ? "text-red-400" : "text-gray-300"}`}>
+            <span>Carga API: <strong className={lastUsage.currentRPM >= 13 ? "text-red-400" : "text-white"}>{lastUsage.currentRPM}/15 RPM</strong></span>
+          </div>
+        </div>
+      )}
 
       {/* Formulario de Entrada */}
       <form

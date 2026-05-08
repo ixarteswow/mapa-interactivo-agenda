@@ -2,6 +2,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AddressEntry } from "@/hooks/useMapStore";
 import type { ToolResult } from "@/lib/chat-tools";
+import { MODEL_NAME, withRetry } from "@/lib/ai-service";
 
 /**
  * Genera un ID único para marcadores
@@ -153,8 +154,8 @@ async function performWebSearch(query: string): Promise<string> {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      tools: [{ googleSearch: {} } as any], // Cast as any para evitar errores de tipo si la versión de SDK es antigua
+      model: MODEL_NAME,
+      tools: [{ googleSearch: {} } as any], 
     });
 
     const prompt = `Busca información actualizada sobre: "${query}".
@@ -164,7 +165,7 @@ async function performWebSearch(query: string): Promise<string> {
     - Resumen general
     - Lista de lugares (si aplica): Nombre - Dirección (Intenta proporcionar solo calle y número para facilitar la geolocalización)`;
 
-    const result = await model.generateContent(prompt);
+    const result = await withRetry(() => model.generateContent(prompt));
     const response = await result.response;
     return response.text();
   } catch (error) {
