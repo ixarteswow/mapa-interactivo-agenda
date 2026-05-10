@@ -16,7 +16,13 @@ export async function proxy(request: NextRequest) {
   
   // Si no hay sesión y no estamos en la página de login, redirigir a login
   if (!sessionCookie && request.nextUrl.pathname !== "/login") {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // Preservar query params (ej: ?s=... para marcadores compartidos)
+    const loginUrl = new URL("/login", request.url);
+    const search = request.nextUrl.search;
+    if (search) {
+      loginUrl.searchParams.set("callbackUrl", `/${search}`);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   // Si hay sesión

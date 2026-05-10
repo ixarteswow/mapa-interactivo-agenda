@@ -1,11 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import { loginAction } from "./actions";
 import { MapPin, Lock, User, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState(loginAction, null);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   return (
     <div className="min-h-screen w-full bg-gray-950 flex items-center justify-center relative overflow-hidden">
@@ -29,6 +32,7 @@ export default function LoginPage() {
         </div>
 
         <form action={formAction} className="space-y-5">
+          <input type="hidden" name="callbackUrl" value={callbackUrl} />
           {state?.error && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />

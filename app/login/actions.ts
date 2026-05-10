@@ -30,7 +30,9 @@ export async function loginAction(prevState: any, formData: FormData) {
     path: "/",
   });
 
-  redirect("/");
+  // Redirigir a la URL original (con ?s= si venía de un enlace compartido)
+  const callbackUrl = (formData.get("callbackUrl") as string) || "/";
+  redirect(callbackUrl);
 }
 
 export async function logoutAction() {
