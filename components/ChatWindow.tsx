@@ -42,7 +42,6 @@ interface ChatWindowProps {
  */
 const ChatWindow: FC<ChatWindowProps> = ({ onClose }) => {
   const [inputValue, setInputValue] = useState("");
-  const [lastUsage, setLastUsage] = useState<{ promptRequests: number; currentRPM: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Stores
@@ -85,43 +84,8 @@ const ChatWindow: FC<ChatWindowProps> = ({ onClose }) => {
       // Obtener historial de conversación
       const history = getHistory();
       
-      // Función de retry con exponential backoff
-      const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3) => {
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-          try {
-            const response = await fetch(url, options);
-            
-            // Si es 503 (Service Unavailable), reintentar
-            if (response.status === 503 && attempt < maxRetries) {
-              const waitTime = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
-              console.log(`⚠️ Error 503, reintentando en ${waitTime}ms... (intento ${attempt + 1}/${maxRetries})`);
-              
-              // Mostrar feedback al usuario
-              toast({
-                type: "info",
-                message: `Servicio ocupado, reintentando... (${attempt + 1}/${maxRetries})`,
-                timeout: 2000,
-              });
-              
-              await new Promise(resolve => setTimeout(resolve, waitTime));
-              continue;
-            }
-            
-            return response;
-          } catch (error) {
-            if (attempt === maxRetries) throw error;
-            
-            const waitTime = Math.pow(2, attempt) * 1000;
-            console.log(`⚠️ Error de red, reintentando en ${waitTime}ms...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-          }
-        }
-        
-        throw new Error("Máximo de reintentos alcanzado");
-      };
-      
-      // Enviar mensaje al API Route del servidor con retry logic
-      const apiResponse = await fetchWithRetry("/api/chat", {
+      // Enviar mensaje al API Route del servidor
+      const apiResponse = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -163,10 +127,7 @@ const ChatWindow: FC<ChatWindowProps> = ({ onClose }) => {
       // Agregar respuesta del asistente
       addMessage("assistant", response.text);
       
-      // Guardar información de uso
-      if (response.usage) {
-        setLastUsage(response.usage);
-      }
+
       
       setError(null);
     } catch (error) {
@@ -264,18 +225,6 @@ const ChatWindow: FC<ChatWindowProps> = ({ onClose }) => {
         </div>
       </header>
 
-      {/* Indicador de uso de API */}
-      {lastUsage && (
-        <div className="px-4 py-2 bg-gray-900/60 border-b border-gray-700 flex justify-between items-center text-xs text-gray-300 font-medium">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span>
-            <span>Último prompt: <strong className="text-white">{lastUsage.promptRequests}</strong> peticiones</span>
-          </div>
-          <div className={`flex items-center gap-2 ${lastUsage.currentRPM >= 13 ? "text-red-400" : "text-gray-300"}`}>
-            <span>Carga API: <strong className={lastUsage.currentRPM >= 13 ? "text-red-400" : "text-white"}>{lastUsage.currentRPM}/15 RPM</strong></span>
-          </div>
-        </div>
-      )}
 
       {/* Área de Mensajes */}
       <div className={STYLES.messagesArea} role="log">
