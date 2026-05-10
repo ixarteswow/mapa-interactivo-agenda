@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css"; // estilos de Leaflet solo en el cliente
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, CircleMarker } from "react-leaflet";
-import { type FC, Fragment, useEffect, useId, useState, useRef } from "react";
+import { type FC, Fragment, useCallback, useEffect, useId, useState, useRef } from "react";
 import { useMapStore } from "@/hooks/useMapStore";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import LocationModal from "./LocationModal";
@@ -122,6 +122,8 @@ const MapLeaflet: FC<MapLeafletProps> = ({ sidebarOpen }) => {
     lat: number;
     lng: number;
   } | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<"idle" | "searching" | "active">("idle");
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const mapKey = useId();
 
   const markers = useMapStore((s) => s.markers);
@@ -176,6 +178,34 @@ const MapLeaflet: FC<MapLeafletProps> = ({ sidebarOpen }) => {
     setModalOpen(false);
     setPendingCoordinates(null);
   };
+
+  // GPS: Obtener ubicación del usuario
+  const handleGpsClick = useCallback(() => {
+    if (!navigator.geolocation) return;
+
+    if (gpsStatus === "active" && userLocation) {
+      // Si ya está activo, re-centrar
+      setCenter(userLocation.lat, userLocation.lng);
+      setZoom(16);
+      return;
+    }
+
+    setGpsStatus("searching");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(loc);
+        setCenter(loc.lat, loc.lng);
+        setZoom(16);
+        setGpsStatus("active");
+      },
+      (err) => {
+        console.error("GPS error:", err.message);
+        setGpsStatus("idle");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [gpsStatus, userLocation, setCenter, setZoom]);
 
   if (!mounted) return null;
 
@@ -254,7 +284,58 @@ const MapLeaflet: FC<MapLeafletProps> = ({ sidebarOpen }) => {
           </Fragment>
         );
       })}
+
+      {/* Marcador de ubicación GPS del usuario */}
+      {userLocation && gpsStatus === "active" && (
+        <>
+          <CircleMarker
+            center={[userLocation.lat, userLocation.lng]}
+            radius={8}
+            pathOptions={{ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.9, weight: 2 }}
+          >
+            <Popup>
+              <div className="text-sm">
+                <strong>📍 Tu ubicación</strong>
+                <br />
+                <span className="text-gray-600">
+                  {userLocation.lat.toFixed(5)}, {userLocation.lng.toFixed(5)}
+                </span>
+              </div>
+            </Popup>
+          </CircleMarker>
+          <CircleMarker
+            center={[userLocation.lat, userLocation.lng]}
+            radius={20}
+            pathOptions={{ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.15, weight: 1 }}
+          />
+        </>
+      )}
       </MapContainer>
+
+      {/* Botón GPS flotante */}
+      <button
+        onClick={handleGpsClick}
+        className={`absolute bottom-6 right-4 z-[1000] w-11 h-11 rounded-full shadow-lg flex items-center justify-center transition-all ${
+          gpsStatus === "searching"
+            ? "bg-blue-500 animate-pulse shadow-blue-500/40"
+            : gpsStatus === "active"
+              ? "bg-green-500 hover:bg-green-600 shadow-green-500/30"
+              : "bg-gray-700 hover:bg-gray-600 shadow-black/30"
+        }`}
+        aria-label={gpsStatus === "searching" ? "Buscando ubicación..." : "Obtener mi ubicación"}
+        title={gpsStatus === "searching" ? "Buscando..." : gpsStatus === "active" ? "Centrar en mi ubicación" : "¿Dónde estoy?"}
+      >
+        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {gpsStatus === "searching" ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          ) : (
+            <>
+              <circle cx="12" cy="12" r="3" strokeWidth={2} />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v3m0 14v3m10-10h-3M5 12H2" />
+            </>
+          )}
+        </svg>
+      </button>
     </>
   );
 };

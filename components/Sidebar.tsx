@@ -12,6 +12,7 @@ import { getGroupColor } from "@/lib/colors";
 import LocationModal from "./LocationModal";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { logoutAction } from "@/app/login/actions";
+import ShareModal from "./ShareModal";
 
 // Nuevas props para controlar la visibilidad en dispositivos móviles
 interface SidebarProps {
@@ -44,6 +45,7 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [onlyCenter, setOnlyCenter] = useState(false); // preferencia: solo centrar
   const [openGroup, setOpenGroup] = useState<string | null>(null); // Estado para acordeón
+  const [sharingGroup, setSharingGroup] = useState<string | null>(null); // Compartir grupo
 
   // Store global (Zustand)
   const markers = useMapStore((s) => s.markers);
@@ -503,6 +505,19 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
                     style={{ backgroundColor: getGroupColor(groupName) }}
                   />
                   {groupName} ({groupStats[groupName] || 0})
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSharingGroup(groupName);
+                    }}
+                    className="ml-auto text-gray-400 hover:text-blue-400 transition-colors p-1"
+                    title={`Compartir carpeta "${groupName}"`}
+                    aria-label={`Compartir carpeta ${groupName}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                  </button>
                 </summary>
                 <ul className="space-y-3 ml-2">
                   {items.map((m) => (
@@ -688,6 +703,16 @@ const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
         initialData={editingLocation}
         defaultCoordinates={mapCenter || { lat: 28.1235, lng: -15.4363 }}
       />
+
+      {/* Modal de compartir carpeta */}
+      {sharingGroup && (
+        <ShareModal
+          isOpen={!!sharingGroup}
+          onClose={() => setSharingGroup(null)}
+          groupName={sharingGroup}
+          markers={groupedMarkers[sharingGroup] || []}
+        />
+      )}
     </aside>
   );
 };
