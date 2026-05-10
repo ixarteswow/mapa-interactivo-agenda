@@ -188,7 +188,8 @@ Responde de forma concisa, amigable y útil.`;
     // Manejo de Function Calling (Iterativo para soportar secuencias como search -> add)
     let functionCalls = response.functionCalls();
     let depth = 0;
-    const MAX_DEPTH = 5;
+    const MAX_DEPTH = 3;
+    const failedTools = new Set<string>(); // Evitar reintentos de herramientas fallidas
 
     while (functionCalls && functionCalls.length > 0 && depth < MAX_DEPTH) {
       depth++;
@@ -201,6 +202,20 @@ Responde de forma concisa, amigable y útil.`;
       const functionResponses: any[] = [];
       
       for (const call of functionCalls) {
+        // Generar clave única para detectar reintentos exactos
+        const toolKey = `${call.name}:${JSON.stringify(call.args)}`;
+
+        if (failedTools.has(toolKey)) {
+          console.log(`  ⛔ Bloqueado reintento de: ${call.name} (ya falló antes)`);
+          const skipResult: ToolResult = {
+            success: false,
+            error: `La herramienta "${call.name}" ya falló previamente con estos parámetros. Usa una estrategia alternativa (ej: search_location).`,
+          };
+          toolsUsed.push({ name: call.name, parameters: call.args || {}, result: skipResult });
+          functionResponses.push({ functionResponse: { name: call.name, response: skipResult } });
+          continue;
+        }
+
         console.log("  → Ejecutando:", call.name, call.args);
 
         // Ejecutar la acción en el servidor
@@ -209,6 +224,11 @@ Responde de forma concisa, amigable y útil.`;
           call.args || {},
           markers,
         );
+
+        // Si falló, registrarla para bloquear reintentos
+        if (!toolResult.success) {
+          failedTools.add(toolKey);
+        }
 
         toolsUsed.push({
           name: call.name,

@@ -130,7 +130,8 @@ export function useServerActions() {
         }
 
         case "list_markers":
-        case "search_location": {
+        case "search_location":
+        case "search_web": {
           // Estas acciones solo retornan datos, no modifican el estado
           // La IA usa los datos para responder al usuario
           return true;

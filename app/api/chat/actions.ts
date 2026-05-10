@@ -1,8 +1,6 @@
 // app/api/chat/actions.ts
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AddressEntry } from "@/hooks/useMapStore";
 import type { ToolResult } from "@/lib/chat-tools";
-import { MODEL_NAME } from "@/lib/ai-service";
 
 /**
  * Genera un ID único para marcadores
@@ -144,33 +142,41 @@ async function searchLocation(query: string): Promise<any> {
 }
 
 /**
- * Realiza una búsqueda en Google usando una instancia separada de Gemini
- * Esto evita el conflicto entre Grounding y Function Calling en el modelo principal
+ * Realiza una búsqueda web usando Nominatim (sin consumir cuota de Gemini).
+ * Devuelve resultados crudos que la IA principal interpretará.
  */
 async function performWebSearch(query: string): Promise<string> {
   try {
-    const apiKey = process.env.GOOGLE_AI_API_KEY;
-    if (!apiKey) throw new Error("API Key no configurada");
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+      {
+        headers: {
+          "User-Agent": "RovoDevInteractiveMap/1.0 (rovo-dev-project)",
+          "Referer": "https://rovo-dev-project.vercel.app"
+        }
+      }
+    );
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
-      tools: [{ googleSearch: {} } as any], 
-    });
+    if (!response.ok) {
+      return `Error al buscar: HTTP ${response.status}`;
+    }
 
-    const prompt = `Busca información actualizada sobre: "${query}".
-    Responde con un resumen útil y conciso.
-    Si encuentras lugares específicos (restaurantes, tiendas, etc.), incluye sus nombres y direcciones si están disponibles.
-    Formato deseado:
-    - Resumen general
-    - Lista de lugares (si aplica): Nombre - Dirección (Intenta proporcionar solo calle y número para facilitar la geolocalización)`;
+    const results = await response.json();
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    if (!results || results.length === 0) {
+      return `No se encontraron resultados para "${query}". Intenta usar search_location con una dirección más específica.`;
+    }
+
+    // Formatear los resultados para que la IA los interprete
+    const formatted = results.map((r: any, i: number) => {
+      const parsed = parseNominatimAddress(r);
+      return `${i + 1}. ${parsed.name} — ${parsed.address}${parsed.CP ? ` (CP: ${parsed.CP})` : ""} — ${parsed.description} [${r.lat}, ${r.lon}]`;
+    }).join("\n");
+
+    return `Resultados encontrados para "${query}":\n${formatted}`;
   } catch (error) {
     console.error("Error en performWebSearch:", error);
-    return "Lo siento, hubo un error al realizar la búsqueda en internet.";
+    return "Lo siento, hubo un error al realizar la búsqueda.";
   }
 }
 
