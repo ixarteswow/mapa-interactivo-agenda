@@ -165,7 +165,7 @@ async function performWebSearch(query: string): Promise<string> {
     - Resumen general
     - Lista de lugares (si aplica): Nombre - Dirección (Intenta proporcionar solo calle y número para facilitar la geolocalización)`;
 
-    const result = await withRetry(() => model.generateContent(prompt));
+    const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text();
   } catch (error) {
