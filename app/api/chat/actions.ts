@@ -2,7 +2,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AddressEntry } from "@/hooks/useMapStore";
 import type { ToolResult } from "@/lib/chat-tools";
-import { MODEL_NAME, withRetry } from "@/lib/ai-service";
+import { MODEL_NAME } from "@/lib/ai-service";
 
 /**
  * Genera un ID único para marcadores
